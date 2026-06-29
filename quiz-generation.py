@@ -46,6 +46,23 @@ model = ChatGoogleGenerativeAI(
    
 )
 
+
+class RAGQuizQuestion(BaseModel):
+    id: int
+    question: str
+    type: Literal["mcq", "true_false"]
+    options: dict[str, str] = Field(
+        description="Keys must be A, B, C, D for mcq. A and B only for true_false."
+    )
+    correct_answer: Literal["A", "B", "C", "D"] = Field(
+        description="The letter of the correct option only"
+    )
+
+ 
+ 
+class RAGQuiz(BaseModel):
+    questions: list[RAGQuizQuestion]
+
 embeddings_model = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
 
 QUIZ_SYSTEM_PROMPT = """
@@ -210,33 +227,41 @@ async def generate_quiz_from_document(
 
 
     RAG_QUIZ_SYSTEM_PROMPT = """
-    You are an expert quiz generator. Generate quiz questions using ONLY the
-    information in the provided CONTEXT below. The context comes directly from
-    a document the educator uploaded - your questions must be grounded in it,
-    not in your own general knowledge.
-    
-    RULES:
-    - Generate exactly the number of questions requested. No more, no less.
-    - Every question must have exactly these fields: id, question, type, options, correct_answer, explanation.
-    - For MCQ questions, always provide exactly 4 options labeled A, B, C, D.
-    - For true_false questions, options must be exactly {"A": "True", "B": "False"}.
-    - correct_answer must always be the letter only: "A", "B", "C", or "D".
-    - Explanation must clearly state why the correct answer is right, referencing
-    the context provided.
-    - Base every question strictly on the CONTEXT. Do not introduce facts that
-    aren't supported by it.
-    - If the CONTEXT does not contain enough information to generate the
-    requested number of quality questions, generate as many as the context
-    genuinely supports rather than inventing content to fill the count.
-    - Questions must match the requested difficulty strictly:
-        easy → basic recall, straightforward concepts
-        medium → application of concepts, some reasoning required
-        hard → edge cases, deep understanding, tricky distinctions
-    
-    DIFFICULTY CONSISTENCY:
-    - If difficulty is "easy", do not sneak in hard questions.
-    - If difficulty is "hard", do not pad with easy questions.
-    """
+You are an expert quiz generator. Generate quiz questions using ONLY the
+information in the provided CONTEXT below. The context comes directly from
+a document the educator uploaded - your questions must be grounded in it,
+not in your own general knowledge.
+ 
+RULES:
+- Generate exactly the number of questions requested. No more, no less.
+- Every question must have exactly these fields: id, question, type, options, correct_answer.
+- For MCQ questions, always provide exactly 4 options labeled A, B, C, D.
+- For true_false questions, options must be exactly {"A": "True", "B": "False"}.
+- correct_answer must always be the letter only: "A", "B", "C", or "D".
+- Base every question strictly on the CONTEXT. Do not introduce facts that
+  aren't supported by it.
+- If the CONTEXT does not genuinely cover the requested topic, return an
+  empty questions list. Do not generate weak or tangentially-related
+  questions just to satisfy the requested count - an empty result is
+  better than questions not actually grounded in the topic.
+ 
+QUESTION INDEPENDENCE:
+- Each question must be fully self-contained and understandable WITHOUT
+  access to the source document.
+- Do NOT reference "the context," "the algorithm states," "according to
+  the document," "the steps," or any structural labels from the source
+  material.
+- Phrase questions as if testing general knowledge of the topic, even
+  though the underlying facts came from the uploaded document.
+ 
+DIFFICULTY:
+- Questions must match the requested difficulty strictly:
+    easy → basic recall, straightforward concepts
+    medium → application of concepts, some reasoning required
+    hard → edge cases, deep understanding, tricky distinctions
+- If difficulty is "easy", do not sneak in hard questions.
+- If difficulty is "hard", do not pad with easy questions.
+"""
 
     relevant_chunks = retrieve_relevant_chunks(query=topic, user_id=user_id, document_id=document_id)
 
@@ -248,7 +273,7 @@ async def generate_quiz_from_document(
     context = "\n\n---\n\n".join(chunk.page_content for chunk in relevant_chunks)
     print(context)
  
-    structured_model = model.with_structured_output(Quiz)
+    structured_model = model.with_structured_output(RAGQuiz)
  
     user_message = f"""
 CONTEXT:
@@ -264,6 +289,13 @@ Base the questions strictly on the CONTEXT above.
     ]
  
     response = await structured_model.ainvoke(messages)
+
+    if not response.questions:
+        raise ValueError(
+            f"The following topic is not covered in this document: '{topic}'"
+        )
+    
+
     return response.questions
 
 
@@ -282,7 +314,7 @@ async def main():
     print("Initializing document..")
     document_id =  InitializeDocument("content.pdf", user_id)
     print("Docment initialized, Generating questions...")
-    questions = await generate_quiz_from_document(document_id, user_id,"binary search trees", 5, "hard", "mcq")
+    questions = await generate_quiz_from_document(document_id, user_id,"BFS", 5, "hard", "mcq")
     print("Here are the questions: ")
     for q in questions:
         print(q.model_dump_json(indent=2))

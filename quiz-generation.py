@@ -12,6 +12,8 @@ from langchain_chroma import Chroma
 from DocumentLoader import load_document
 import uuid
 import asyncio
+
+
 load_dotenv()
 
 if os.environ['GOOGLE_API_KEY']:

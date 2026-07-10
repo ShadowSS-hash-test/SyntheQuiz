@@ -1,1 +1,1 @@
-from .connectDB import get_db
+from . import connectDB

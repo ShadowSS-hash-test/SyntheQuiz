@@ -4,7 +4,7 @@ import os
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader
 from langchain_core.documents import Document
 
-from config import (
+from .config import (
     MAX_PAGES,
     MAX_FILE_SIZE_MB,
     MAX_CHARACTERS,

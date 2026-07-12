@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     document_id  UUID         NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
     user_id      UUID         NOT NULL REFERENCES users(user_id)         ON DELETE CASCADE,
     content      TEXT         NOT NULL CHECK (char_length(trim(content)) > 0),
-    embedding    VECTOR(768),
+    embedding    VECTOR(3072),
     metadata     JSONB,
     created_at   TIMESTAMP    DEFAULT now()
 );
@@ -79,15 +79,14 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
     question       TEXT          NOT NULL CHECK (char_length(trim(question)) > 0),
     question_type  question_type NOT NULL,
     options        JSONB         NOT NULL,
-    correct_answer VARCHAR(1)    NOT NULL CHECK (correct_answer IN ('A', 'B', 'C', 'D','T','F')),
-    explanation    TEXT          CHECK (explanation IS NULL OR char_length(trim(explanation)) > 0),
-    position       SMALLINT      NOT NULL
+    correct_answer VARCHAR(1)    NOT NULL CHECK (correct_answer IN ('A', 'B', 'C', 'D', 'T', 'F')),
+    explanation    TEXT          CHECK (explanation IS NULL OR char_length(trim(explanation)) > 0)
+    
 );
 
 -- INDEXES
-CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx ON document_chunks USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS document_chunks_embedding_idx ON document_chunks USING hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops);
 CREATE INDEX IF NOT EXISTS document_chunks_doc_user_idx ON document_chunks (document_id, user_id);
 CREATE INDEX IF NOT EXISTS quizzes_user_idx ON quizzes (user_id);
 CREATE INDEX IF NOT EXISTS quizzes_course_idx ON quizzes (course_id);
-CREATE INDEX IF NOT EXISTS quiz_questions_quiz_pos_idx ON quiz_questions (quiz_id, position);
 CREATE INDEX IF NOT EXISTS documents_user_idx ON documents (user_id);

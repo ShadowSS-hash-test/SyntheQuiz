@@ -2,7 +2,8 @@
 import os
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from routes  import (user_router, course_router)
+from routes  import (user_router, course_router, quiz_router,genAI_router)
+
 
 
 from db import connectDB
@@ -40,6 +41,8 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(user_router)
 app.include_router(course_router)
+app.include_router(quiz_router)
+app.include_router(genAI_router)
 
 
 @app.get("/")

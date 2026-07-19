@@ -7,6 +7,7 @@ from db.connectDB import get_db
 from pydantic import BaseModel, Field
 from controllers.genAI_controllers import (initialize_document,  generate_quiz_without_notes, generate_quiz_from_document)
 from util.config import ALLOWED_FILE_TYPES
+from middleware.authCheck import (verify_educator,verify_user_token)
 
 
 TEMP_UPLOAD_DIR = "./temp_uploads"
@@ -26,10 +27,11 @@ class GenerateRAGQuizRequest(BaseModel):
     num_questions: int = Field(default=5, ge=1, le=20)
     difficulty: str = Field(description="easy, medium, or hard")
     question_type: str = Field(description="mcq or true_false")
+    
+from middleware.authCheck import (verify_educator,verify_user_token)
 
 
-
-genAI_router = APIRouter(prefix="/quiz", tags=["Documents"])
+genAI_router = APIRouter(prefix="/quiz", tags=["Documents"],dependencies=[Depends(verify_educator)])
 
 @genAI_router.post("/upload_document")
 async def upload_document_endpoint(

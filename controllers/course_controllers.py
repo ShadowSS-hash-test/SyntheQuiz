@@ -333,3 +333,32 @@ async def get_enrolled_users(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected internal server error occurred."
         )
+    
+
+async def get_user_courses(
+    user_id: uuid.UUID,
+    db: asyncpg.Connection,
+) -> List[CourseResponse]:
+    """
+    Fetches all courses a specific user is enrolled in.
+    """
+    try:
+        rows = await db.fetch(
+            """
+            SELECT c.course_id, c.course_name, c.course_coordinator, c.created_at
+            FROM courses c
+            JOIN enrollment_list e ON c.course_id = e.course_id
+            WHERE e.user_id = $1
+            """,
+            user_id
+        )
+        
+        # Reuse your existing helper to format the rows
+        return [_format_course(row) for row in rows]
+        
+    except Exception as e:
+        print(f"Error in get_user_courses: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected internal server error occurred."
+        )

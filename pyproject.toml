@@ -15,5 +15,6 @@ dependencies = [
     "langchain-google-genai>=4.2.5",
     "langchain-text-splitters>=1.1.2",
     "pgvector>=0.4.2",
+    "pyjwt>=2.13.0",
     "pypdf>=6.13.3",
 ]

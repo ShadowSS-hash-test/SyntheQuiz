@@ -6,7 +6,7 @@ from controllers.user_controllers import (
     update_user, delete_user,
     RegisterRequest, LoginRequest, UpdateUserRequest
 )
-from middleware.authCheck import (verify_educator,verify_user_token)
+from middleware.authCheck import (verify_user_token)
 
 user_router = APIRouter(prefix="/users", tags=["users"])
 
@@ -18,14 +18,14 @@ async def register(payload: RegisterRequest, db=Depends(get_db)):
 async def login(payload: LoginRequest, db=Depends(get_db)):
     return await login_user(payload, db)
 
-@user_router.get("/{user_id}",dependencies=[Depends(verify_educator)])
+@user_router.get("/{user_id}",dependencies=[Depends(verify_user_token)])
 async def get_user(user_id: str, db=Depends(get_db), ):
     return await get_user_by_id(user_id, db)
 
-@user_router.patch("/{user_id}",dependencies=[Depends(verify_educator)])
+@user_router.patch("/{user_id}",dependencies=[Depends(verify_user_token)])
 async def update(user_id: str, payload: UpdateUserRequest, db=Depends(get_db)):
     return await update_user(user_id, payload, db)
 
-@user_router.delete("/{user_id}",dependencies=[Depends(verify_educator)])
+@user_router.delete("/{user_id}",dependencies=[Depends(verify_user_token)])
 async def delete(user_id: str, db=Depends(get_db)):
     return await delete_user(user_id, db)

@@ -31,7 +31,7 @@ class GenerateRAGQuizRequest(BaseModel):
 from middleware.authCheck import (verify_educator,verify_user_token)
 
 
-genAI_router = APIRouter(prefix="/quiz", tags=["Documents"],dependencies=[Depends(verify_educator)])
+genAI_router = APIRouter(prefix="/quiz", tags=["Documents"],dependencies=[Depends(verify_user_token)])
 
 @genAI_router.post("/upload_document")
 async def upload_document_endpoint(

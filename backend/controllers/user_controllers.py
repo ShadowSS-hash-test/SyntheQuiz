@@ -175,52 +175,7 @@ def clear_auth_cookies(response: JSONResponse) -> JSONResponse:
 # CONTROLLERS
 # ============================================================
  
-async def register_user(
-    payload: RegisterRequest,
-    db: asyncpg.Connection,
-) -> UserResponse:
-    """
-    Creates a new user. Checks for duplicate email first,
-    then hashes the password before storing.
-    """
-    try:
-        existing = await db.fetchrow(
-            "SELECT user_id FROM users WHERE email = $1",
-            payload.email,
-        )
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="An account with this email already exists.",
-            )
-     
-        # Await the async hash function
-        password_hash = await _hash_password(payload.password)
-     
-        row = await db.fetchrow(
-            """
-            INSERT INTO users (first_name, last_name, email, password_hash, user_type)
-            VALUES ($1, $2, $3, $4, $5::user_type)
-            RETURNING user_id, first_name, last_name, email, user_type, created_at
-            """,
-            payload.first_name,
-            payload.last_name,
-            payload.email,
-            password_hash,
-            payload.user_type,
-        )
-     
-        return _format_user(row)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error in register_user: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected internal server error occurred."
-        )
- 
+
 async def register_user(
     payload: RegisterRequest,
     db: asyncpg.Connection,

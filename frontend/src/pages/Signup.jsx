@@ -9,7 +9,7 @@ const Signup = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [userType, setUserType] = useState('student'); // 'student' or 'educator'
+  const [userType, setUserType] = useState('educator'); // 'student' or 'educator'
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
@@ -66,39 +66,7 @@ const Signup = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             
-            {/* User Type Selection */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
-                I am a...
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setUserType('student')}
-                  className={`py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all duration-200 ${
-                    userType === 'student'
-                      ? 'bg-blue-600 text-white border border-blue-500 shadow-lg shadow-blue-500/20'
-                      : 'bg-gray-900/50 text-gray-400 border border-gray-700 hover:bg-gray-800'
-                  }`}
-                >
-                  <GraduationCap size={18} />
-                  Student
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUserType('educator')}
-                  className={`py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all duration-200 ${
-                    userType === 'educator'
-                      ? 'bg-blue-600 text-white border border-blue-500 shadow-lg shadow-blue-500/20'
-                      : 'bg-gray-900/50 text-gray-400 border border-gray-700 hover:bg-gray-800'
-                  }`}
-                >
-                  <Presentation size={18} />
-                  Educator
-                </button>
-              </div>
-            </div>
-
+        
             {/* First & Last Name Grid */}
             <div className="grid grid-cols-2 gap-4">
               <div>

@@ -7,7 +7,9 @@ import Homepage from './pages/Homepage'
 import { Router, Routes,Route } from 'react-router-dom'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
-import StudentDashboard from './pages/StudentDashboard'
+import Dashboard from './pages/Dashboard'
+import QuestionCuration from './components/Questioncuration'
+
 
 
 function App() {
@@ -19,7 +21,9 @@ function App() {
         <Route path="/" element={<Homepage />} />
         <Route path="/login" element={<Login />} />
         <Route path='/signup' element={<Signup/>}/>
-        <Route path='/studentDashboard' element={<StudentDashboard/>}/>
+        <Route path='/dashboard' element={<Dashboard/>}/>
+        <Route path='/quizcreate' element={<QuestionCuration/>}></Route>
+     
 
       </Routes>
   

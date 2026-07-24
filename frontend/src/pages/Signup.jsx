@@ -9,13 +9,13 @@ const Signup = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [userType, setUserType] = useState('educator'); // 'student' or 'educator'
+  const [userType, setUserType] = useState('educator'); 
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setError(''); // Clear previous errors
-
+    setError(''); 
+    
     // Basic validation
     if (password !== confirmPassword) {
       setError('Passwords do not match. Please try again.');
@@ -26,7 +26,7 @@ const Signup = () => {
       first_name: firstName,
       last_name: lastName,
       email,
-      password, // backend should hash this into password_hash
+      password,
       user_type: userType
     });
   };

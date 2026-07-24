@@ -185,6 +185,13 @@ async def register_user(
     then hashes the password before storing. Returns JSON + Auth Cookies.
     """
     try:
+
+        if payload.user_type == "student":
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"message": "Invalid role. Only educator accounts can be registered."},
+            )
+         
         existing = await db.fetchrow(
             "SELECT user_id FROM users WHERE email = $1",
             payload.email,

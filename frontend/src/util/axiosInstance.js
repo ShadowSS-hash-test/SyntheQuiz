@@ -4,7 +4,7 @@ const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const axiosInstance = axios.create({
   baseURL,
-  // CRITICAL: This tells Axios to always send your HttpOnly cookies with every request
+
   withCredentials: true, 
 });
 

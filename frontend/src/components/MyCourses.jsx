@@ -1,39 +1,77 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, FileText, Download, Eye, BookOpen, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Plus, FileText, Download, Eye, BookOpen, CheckCircle2, X, Loader2 } from 'lucide-react';
+import useCourseStore from '../stores/useCourseStore'; 
+import useUserStore from '../stores/useUserStore'; 
 
 const MyCourses = () => {
-  // Navigation State
+  // ─── UI NAVIGATION STATE ──────────────────────────────────────────────────
+  // Tracks which specific course or quiz the user is currently viewing.
+  // If null, the user is looking at the top-level list.
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
 
-  // Data State
-  const [courses, setCourses] = useState([]);
+  // ─── MODAL & FORM STATE ───────────────────────────────────────────────────
+  // Controls the visibility of the "Create Course" modal and stores the form input.
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newCourseName, setNewCourseName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ─── GLOBAL STORES ────────────────────────────────────────────────────────
+  const { courses, fetchCourses, createCourse, loading } = useCourseStore();
+  
+  // We need the user object to attach their UUID as the course_coordinator
+  // to satisfy your FastAPI backend's CreateCourseRequest schema.
+  const { user } = useUserStore();
+
+  // ─── MOCK DATA STATE (Temporary) ──────────────────────────────────────────
   const [quizzes, setQuizzes] = useState([]);
   const [quizDetails, setQuizDetails] = useState(null);
 
-  // 1. Mock fetching courses
+  // Fetch actual courses immediately when this component mounts
   useEffect(() => {
-    setCourses([
-      { id: 1, title: 'Introduction to Computer Science', code: 'CS101', quizCount: 4 },
-      { id: 2, title: 'Data Structures & Algorithms', code: 'CS201', quizCount: 2 },
-      { id: 3, title: 'Cellular & Molecular Biology', code: 'BIO301', quizCount: 5 },
-    ]);
-  }, []);
+    fetchCourses();
+  }, [fetchCourses]);
 
-  // Handle drilling down into a course
+  // ─── HANDLERS ─────────────────────────────────────────────────────────────
+
+  /**
+   * Handles the form submission to create a new course.
+   * We pass both the typed name and the logged-in user's ID to the store.
+   */
+  const handleCreateCourse = async (e) => {
+    e.preventDefault(); // Prevents the browser from refreshing on form submit
+    
+    if (!newCourseName.trim()) return; // Don't submit empty strings
+
+    setIsSubmitting(true);
+
+    // Call the Zustand store action to hit the FastAPI backend
+    const newCourse = await createCourse({
+      course_name: newCourseName,
+      course_coordinator: user.user_id 
+    });
+
+    // If successful (newCourse is not null), reset the UI state
+    if (newCourse) {
+      setIsCreateModalOpen(false);
+      setNewCourseName('');
+    }
+    
+    setIsSubmitting(false);
+  };
+
   const handleCourseClick = (course) => {
     setSelectedCourse(course);
-    // Mock fetching quizzes for this course
+    // TODO: Replace with actual fetchQuizzesByCourseId when useQuizStore is built
     setQuizzes([
       { id: 101, title: 'Midterm Prep: Arrays & Linked Lists', date: '2026-07-15', questionCount: 2 },
       { id: 102, title: 'Pop Quiz: Big O Notation & Recursion', date: '2026-07-20', questionCount: 10 },
     ]);
   };
 
-  // Handle drilling down into a specific quiz
   const handleQuizClick = (quiz) => {
     setSelectedQuiz(quiz);
-    // Mock fetching the actual questions from GET /quizzes/{id}
+    // TODO: Replace with actual fetchQuizDetails when useQuizStore is built
     setQuizDetails({
       ...quiz,
       questions: [
@@ -55,7 +93,7 @@ const MyCourses = () => {
     });
   };
 
-  // ── VIEW 3: QUIZ DETAILS ───────────────────────────────────────────────
+  // ─── VIEW 3: QUIZ DETAILS ─────────────────────────────────────────────────
   if (selectedQuiz && quizDetails) {
     return (
       <div className="max-w-4xl mx-auto animate-fade-in-up pb-20">
@@ -63,12 +101,13 @@ const MyCourses = () => {
           onClick={() => setSelectedQuiz(null)}
           className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-blue-400 hover:text-blue-300 transition-colors"
         >
-          <ArrowLeft size={16} /> Back to {selectedCourse.code} Quizzes
+          <ArrowLeft size={16} /> Back to {selectedCourse.course_name}
         </button>
 
+        {/* Header Section */}
         <div className="flex justify-between items-end mb-8">
           <div>
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{selectedCourse.code} · Generated {quizDetails.date}</span>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Generated {quizDetails.date}</span>
             <h1 className="text-3xl font-bold text-white mt-1">{quizDetails.title}</h1>
           </div>
           <button className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-full shadow-lg shadow-blue-500/20 hover:bg-blue-500 transition-all flex items-center gap-2">
@@ -76,6 +115,7 @@ const MyCourses = () => {
           </button>
         </div>
 
+        {/* Render Questions List */}
         <div className="space-y-4">
           {quizDetails.questions.map((q, idx) => (
             <div key={q.id} className="bg-gray-800/40 backdrop-blur-md border border-gray-600/30 rounded-2xl p-6">
@@ -116,7 +156,7 @@ const MyCourses = () => {
     );
   }
 
-  // ── VIEW 2: COURSE DETAILS (QUIZ LIST) ─────────────────────────────────
+  // ─── VIEW 2: COURSE DETAILS (QUIZ LIST) ───────────────────────────────────
   if (selectedCourse) {
     return (
       <div className="max-w-6xl mx-auto animate-fade-in-up">
@@ -127,15 +167,18 @@ const MyCourses = () => {
           <ArrowLeft size={16} /> Back to My Courses
         </button>
 
+        {/* Course Header */}
         <div className="mb-10 bg-gray-800/40 backdrop-blur-md border border-gray-500/30 rounded-3xl p-8 shadow-xl">
           <span className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold rounded-full uppercase tracking-wider">
-            {selectedCourse.code}
+            {/* Taking the first chunk of the UUID to act as a visual Course Code */}
+            {selectedCourse.course_id.split('-')[0]} 
           </span>
           <h1 className="text-3xl lg:text-4xl font-bold text-white mt-3">
-            {selectedCourse.title}
+            {selectedCourse.course_name}
           </h1>
         </div>
 
+        {/* Quizzes List Container */}
         <div className="bg-gray-800/40 backdrop-blur-md border border-gray-500/30 rounded-3xl overflow-hidden shadow-2xl">
           <div className="px-8 py-5 border-b border-gray-700/60 bg-gray-800/60 flex justify-between items-center">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -148,10 +191,7 @@ const MyCourses = () => {
           <div className="divide-y divide-gray-700/50">
             {quizzes.length > 0 ? (
               quizzes.map((quiz) => (
-                <div
-                  key={quiz.id}
-                  className="px-8 py-6 hover:bg-gray-800/60 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                >
+                <div key={quiz.id} className="px-8 py-6 hover:bg-gray-800/60 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <h3 className="font-bold text-white text-base">{quiz.title}</h3>
                     <div className="flex items-center gap-4 text-xs text-gray-400 mt-1">
@@ -185,9 +225,60 @@ const MyCourses = () => {
     );
   }
 
-  // ── VIEW 1: COURSE LIST ────────────────────────────────────────────────
+  // ─── VIEW 1: COURSE LIST (MAIN VIEW) ──────────────────────────────────────
   return (
-    <div className="max-w-6xl mx-auto animate-fade-in-up">
+    <div className="max-w-6xl mx-auto animate-fade-in-up relative">
+      
+      {/* ── CREATE COURSE MODAL OVERLAY ── 
+          Rendered conditionally over the whole screen using fixed positioning.
+          The backdrop-blur creates a glass effect over the dashboard.
+      */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-3xl p-8 w-full max-w-md shadow-2xl relative animate-fade-in-up">
+            
+            {/* Close Button */}
+            <button 
+              onClick={() => {
+                setIsCreateModalOpen(false);
+                setNewCourseName(''); // Clear input if user cancels
+              }}
+              className="absolute top-6 right-6 text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <h2 className="text-2xl font-bold text-white mb-2">Create New Course</h2>
+            <p className="text-sm text-gray-400 mb-6">Give your course a name to start generating tailored quizzes.</p>
+
+            <form onSubmit={handleCreateCourse} className="space-y-6">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                  Course Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g., Intro to Computer Science"
+                  value={newCourseName}
+                  onChange={(e) => setNewCourseName(e.target.value)}
+                  className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting || !newCourseName.trim()}
+                className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/20 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? <><Loader2 size={16} className="animate-spin" /> Creating...</> : 'Create Course'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Main Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
         <div>
           <p className="text-xs font-semibold text-blue-400 uppercase tracking-widest mb-1">
@@ -195,40 +286,61 @@ const MyCourses = () => {
           </p>
           <h1 className="text-3xl lg:text-4xl font-bold text-white">My Courses</h1>
         </div>
-        <button className="px-6 py-3.5 bg-blue-600 text-white text-sm font-semibold rounded-full shadow-lg shadow-blue-500/20 hover:bg-blue-500 transition-all flex items-center gap-2">
+        <button 
+          onClick={() => setIsCreateModalOpen(true)}
+          className="px-6 py-3.5 bg-blue-600 text-white text-sm font-semibold rounded-full shadow-lg shadow-blue-500/20 hover:bg-blue-500 transition-all flex items-center gap-2 active:scale-95"
+        >
           <Plus size={18} /> New Course
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {courses.map((course) => (
-          <div
-            key={course.id}
-            onClick={() => handleCourseClick(course)}
-            className="rounded-3xl p-6 border border-gray-500/30 bg-gray-800/40 backdrop-blur-md hover:border-blue-500/50 hover:bg-gray-800/60 transition-all duration-300 shadow-xl cursor-pointer group flex flex-col justify-between"
+      {/* Display States */}
+      {loading && courses.length === 0 ? (
+        <div className="text-center py-20 text-gray-400 flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          Loading courses...
+        </div>
+      ) : courses.length === 0 ? (
+        <div className="text-center py-20 border border-dashed border-gray-700 rounded-3xl bg-gray-800/20">
+          <p className="text-gray-400 mb-4">You haven't created any courses yet.</p>
+          <button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="text-blue-400 font-semibold hover:text-blue-300 transition-colors"
           >
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <span className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold rounded-full">
-                  {course.code}
-                </span>
-                <div className="w-8 h-8 rounded-xl bg-gray-800/80 border border-gray-600/50 text-blue-400 flex items-center justify-center">
-                  <BookOpen size={16} />
+            + Create your first course
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {courses.map((course) => (
+            <div
+              key={course.course_id}
+              onClick={() => handleCourseClick(course)}
+              className="rounded-3xl p-6 border border-gray-500/30 bg-gray-800/40 backdrop-blur-md hover:border-blue-500/50 hover:bg-gray-800/60 transition-all duration-300 shadow-xl cursor-pointer group flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <span className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold rounded-full">
+                    {course.course_id.split('-')[0]}
+                  </span>
+                  <div className="w-8 h-8 rounded-xl bg-gray-800/80 border border-gray-600/50 text-blue-400 flex items-center justify-center">
+                    <BookOpen size={16} />
+                  </div>
                 </div>
+                <h3 className="font-bold text-white text-lg group-hover:text-blue-400 transition-colors mb-2">
+                  {course.course_name}
+                </h3>
               </div>
-              <h3 className="font-bold text-white text-lg group-hover:text-blue-400 transition-colors mb-2">
-                {course.title}
-              </h3>
+              <div className="mt-6 pt-4 border-t border-gray-700/50 flex justify-between items-center text-xs text-gray-400">
+                <span>View Course</span>
+                <span className="text-blue-400 group-hover:translate-x-1 transition-transform">
+                  &rarr;
+                </span>
+              </div>
             </div>
-            <div className="mt-6 pt-4 border-t border-gray-700/50 flex justify-between items-center text-xs text-gray-400">
-              <span>{course.quizCount} Quizzes Created</span>
-              <span className="text-blue-400 group-hover:translate-x-1 transition-transform">
-                View Quizzes &rarr;
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

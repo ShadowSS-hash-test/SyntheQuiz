@@ -45,6 +45,33 @@ def _format_course(row: asyncpg.Record) -> CourseResponse:
     )
 
 
+async def get_courses_by_coordinator(
+    coordinator_id: uuid.UUID,
+    db: asyncpg.Connection,
+) -> List[CourseResponse]:
+    """
+    Fetches all courses managed by a specific coordinator.
+    """
+    try:
+        rows = await db.fetch(
+            """
+            SELECT course_id, course_name, course_coordinator, created_at
+            FROM courses
+            WHERE course_coordinator = $1
+            ORDER BY created_at DESC
+            """,
+            coordinator_id,
+        )
+        return [_format_course(row) for row in rows]
+        
+    except Exception as e:
+        print(f"Error in get_courses_by_coordinator: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected internal server error occurred."
+        )
+
+
 
 async def create_course(
     payload: CreateCourseRequest,

@@ -298,6 +298,18 @@ async def login_user(
             detail="An unexpected internal server error occurred."
         )
 
+async def logout_user() -> JSONResponse:
+    """
+    Clears the access_token / refresh_token cookies.
+    No DB work needed since these are stateless JWTs.
+    """
+    response = JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"message": "Logged out successfully"},
+    )
+    return clear_auth_cookies(response)
+
+
 async def get_user_by_id(
     user_id: uuid.UUID, # FastAPI natively validates the UUID
     db: asyncpg.Connection,

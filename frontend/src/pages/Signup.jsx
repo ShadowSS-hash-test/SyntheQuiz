@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, Mail, Lock, Sparkles, GraduationCap, Presentation, User } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, Mail, Lock, User, Loader2 } from "lucide-react";
+import useUserStore from '../stores/useUserStore'; 
 
 const Signup = () => {
-  // State mapping exactly to your database fields
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -12,17 +12,26 @@ const Signup = () => {
   const [userType, setUserType] = useState('educator'); 
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const navigate = useNavigate();
+  const { signup, loading, user } = useUserStore();
+
+  // Redirect to dashboard on successful registration
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(''); 
     
-    // Basic validation
     if (password !== confirmPassword) {
       setError('Passwords do not match. Please try again.');
       return;
     }
 
-    console.log("Registering user:", {
+    await signup({
       first_name: firstName,
       last_name: lastName,
       email,
@@ -43,14 +52,11 @@ const Signup = () => {
         
         {/* Header */}
         <div className="text-center mb-8">
-          
-          {/* Logo */}
           <Link to="/" className="block">
             <h2 className="text-3xl font-extrabold uppercase tracking-widest text-white hover:opacity-80 transition-opacity">
               Synthe<span className="text-blue-500">Quiz</span>
             </h2>
           </Link>
-          
           <p className="text-sm text-gray-400 mt-2">Create your account to start generating quizzes.</p>
         </div>
 
@@ -66,7 +72,6 @@ const Signup = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             
-        
             {/* First & Last Name Grid */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -170,9 +175,18 @@ const Signup = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm px-6 py-3.5 mt-2 rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm px-6 py-3.5 mt-2 rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/20 active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Create Account <ArrowRight size={16} />
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Creating...
+                </>
+              ) : (
+                <>
+                  Create Account <ArrowRight size={16} />
+                </>
+              )}
             </button>
           </form>
 

@@ -1,34 +1,39 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
-import Homepage from './pages/Homepage'
-import { Router, Routes,Route } from 'react-router-dom'
-import Login from './pages/Login'
-import Signup from './pages/Signup'
-import Dashboard from './pages/Dashboard'
-import QuestionCuration from './components/Questioncuration'
+import { useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import useUserStore from './stores/useUserStore';
 
+import Homepage from './pages/Homepage';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Dashboard from './pages/Dashboard';
+import QuestionCuration from './components/Questioncuration';
+import ProtectedRoute from './components/ProtectedRoute'
+import './App.css';
 
+function App() { 
+  const { checkAuth, user } = useUserStore();
 
-function App() {
  
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   return (
+    <Routes>
+      {/* PUBLIC ROUTES: Load instantly for everyone */}
+      <Route path="/" element={<Homepage />} />
+      
+      {/* Redirect logged-in users away from auth pages */}
+      <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+      <Route path="/signup" element={user ? <Navigate to="/dashboard" /> : <Signup />} />
 
-      <Routes>
-        <Route path="/" element={<Homepage />} />
-        <Route path="/login" element={<Login />} />
-        <Route path='/signup' element={<Signup/>}/>
-        <Route path='/dashboard' element={<Dashboard/>}/>
-        <Route path='/quizcreate' element={<QuestionCuration/>}></Route>
-     
-
-      </Routes>
-  
-  )
+      {/* PRIVATE ROUTES: Guarded by ProtectedRoute */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/quizcreate" element={<QuestionCuration />} />
+      </Route>
+    </Routes>
+  );
 }
 
-export default App
-   
+export default App;

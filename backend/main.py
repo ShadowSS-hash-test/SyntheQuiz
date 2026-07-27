@@ -1,6 +1,7 @@
 # main.py
 import os
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from routes  import (user_router, course_router, quiz_router,genAI_router)
 
@@ -39,6 +40,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Frontend runs on a different origin (Vite dev server), and the auth flow
+# relies on httpOnly cookies, so credentials must be allowed and the origin
+# list must be explicit (wildcard "*" does not work with credentials).
+FRONTEND_ORIGINS = os.environ.get(
+    "FRONTEND_ORIGINS", "http://localhost:5173"
+).split(",")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=FRONTEND_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(user_router)
 app.include_router(course_router)
 app.include_router(quiz_router)
@@ -47,4 +63,4 @@ app.include_router(genAI_router)
 
 @app.get("/")
 async def root():
-    return {"message": "SyntheQuiz API is active and tables are synced!"} 
+    return {"message": "SyntheQuiz API is active and tables are synced!"}

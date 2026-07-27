@@ -1,15 +1,25 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, Mail, Lock, Sparkles, GraduationCap, Presentation } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, Mail, Lock, Loader2 } from "lucide-react";
+import useUserStore from '../stores/useUserStore'; 
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [userType, setUserType] = useState('student'); 
+  
+  const navigate = useNavigate();
+  const { login, loading, user } = useUserStore();
 
-  const handleSubmit = (e) => {
+  // Redirect to dashboard if user is successfully logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Logging in with:", { email, password, userType });
+    await login({ email, password });
   };
 
   return (
@@ -24,14 +34,11 @@ const Login = () => {
         
         {/* Logo Head */}
         <div className="text-center mb-8">
-         
-          {/* Clicks back to home */}
           <Link to="/" className="block">
             <h2 className="text-3xl font-extrabold uppercase tracking-widest text-white hover:opacity-80 transition-opacity">
               Synthe<span className="text-blue-500">Quiz</span>
             </h2>
           </Link>
-          
           <p className="text-sm text-gray-400 mt-2">Welcome back! Sign in to access your account.</p>
         </div>
 
@@ -39,8 +46,6 @@ const Login = () => {
         <div className="bg-gray-800/40 backdrop-blur-md border border-gray-500/30 rounded-3xl p-8 shadow-2xl shadow-black/40">
           <form onSubmit={handleSubmit} className="space-y-6">
             
-         
-
             {/* Email Field */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
@@ -67,7 +72,6 @@ const Login = () => {
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">
                   Password
                 </label>
-            
               </div>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500">
@@ -84,20 +88,23 @@ const Login = () => {
               </div>
             </div>
 
-   
-
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/20 active:scale-[0.98] cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Sign In <ArrowRight size={16} />
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Signing In...
+                </>
+              ) : (
+                <>
+                  Sign In <ArrowRight size={16} />
+                </>
+              )}
             </button>
           </form>
-
-      
-
-        
         </div>
 
         {/* Bottom Redirect Link */}

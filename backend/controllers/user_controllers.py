@@ -146,7 +146,7 @@ def set_auth_cookies(response: JSONResponse, user_id: str, user_type: str) -> JS
             key=ACCESS_COOKIE_NAME,
             value=access_token,
             httponly=True,
-            samesite="lax",
+            samesite="none",
             secure=not IS_DEV,  
             max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
@@ -154,7 +154,7 @@ def set_auth_cookies(response: JSONResponse, user_id: str, user_type: str) -> JS
             key=REFRESH_COOKIE_NAME,
             value=refresh_token,
             httponly=True,
-            samesite="lax",
+            samesite="none",
             secure=not IS_DEV,  
             max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         )
@@ -479,7 +479,7 @@ async def refresh_access_token(request: Request) -> JSONResponse:
             key=ACCESS_COOKIE_NAME,
             value=new_access_token,
             httponly=True,
-            samesite="lax",
+            samesite="none",
             secure=not IS_DEV,  
             max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )

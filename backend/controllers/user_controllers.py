@@ -11,6 +11,8 @@ import uuid
 import jwt
 from datetime import datetime, timedelta, timezone
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 JWT_SECRET              = os.environ.get("JWT_SECRET")
 JWT_ALGORITHM           = os.environ.get("JWT_ALGORITHM", "HS256")
@@ -19,7 +21,7 @@ REFRESH_TOKEN_EXPIRE_DAYS    = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", 7
  
 ACCESS_COOKIE_NAME  = "access_token"
 REFRESH_COOKIE_NAME = "refresh_token"
- 
+IS_DEV = os.getenv("NODE_ENV") == "DEVELOPMENT"
 
  
  
@@ -145,7 +147,7 @@ def set_auth_cookies(response: JSONResponse, user_id: str, user_type: str) -> JS
             value=access_token,
             httponly=True,
             samesite="lax",
-            secure=False,  
+            secure=not IS_DEV,  
             max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
         response.set_cookie(
@@ -153,7 +155,7 @@ def set_auth_cookies(response: JSONResponse, user_id: str, user_type: str) -> JS
             value=refresh_token,
             httponly=True,
             samesite="lax",
-            secure=False,  
+            secure=not IS_DEV,  
             max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         )
         return response
@@ -478,7 +480,7 @@ async def refresh_access_token(request: Request) -> JSONResponse:
             value=new_access_token,
             httponly=True,
             samesite="lax",
-            secure=False,  
+            secure=not IS_DEV,  
             max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
         

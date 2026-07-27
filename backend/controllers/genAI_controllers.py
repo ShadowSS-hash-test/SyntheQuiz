@@ -1,5 +1,3 @@
-# controllers/rag_controller.py
-
 import os
 import uuid
 import json
@@ -61,8 +59,6 @@ class Quiz(BaseModel):
     questions: list[QuizQuestion]
 
 
-# (Optional: You can actually just reuse QuizQuestion for RAG now 
-# since explanation is Optional, but if you want strict separation:)
 class RAGQuizQuestion(BaseModel):
     question: str
     question_type: Literal["mcq", "true_false"]
@@ -165,7 +161,8 @@ def chunk_documents(
 async def initialize_document(
     file_path: str, 
     user_id: uuid.UUID, 
-    course_id: Optional[uuid.UUID], 
+    course_id: Optional[uuid.UUID],
+    filename: str,  # Now dynamically receives the custom name
     db: asyncpg.Connection
 ) -> str:
     """
@@ -174,7 +171,6 @@ async def initialize_document(
     """
     try:
         document = load_document(file_path)
-        filename = os.path.basename(file_path)
         
         async with db.transaction():
             # 1. Track parent record in the documents table
@@ -322,7 +318,6 @@ async def generate_quiz_from_document(
         relevant_chunks = await retrieve_relevant_chunks(
             query=topic, user_id=user_id, document_id=document_id, db=db
         )
-
 
         if not relevant_chunks:
             raise HTTPException(

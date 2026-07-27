@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from routes  import (user_router, course_router, quiz_router,genAI_router)
+from routes.document_routes import document_router
 
 
 
@@ -59,6 +60,7 @@ app.include_router(user_router)
 app.include_router(course_router)
 app.include_router(quiz_router)
 app.include_router(genAI_router)
+app.include_router(document_router)
 
 
 @app.get("/")

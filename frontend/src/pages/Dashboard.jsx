@@ -33,7 +33,7 @@ const Dashboard = () => {
       {/* Dynamic Main Workspace */}
       <main className="flex-1 overflow-y-auto p-8 lg:p-12 relative">
         {/* Background glow kept consistent with your other views */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden fixed">
+        <div className="pointer-events-none  inset-0 overflow-hidden fixed">
           <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-blue-600/10 blur-[100px]" />
         </div>
         

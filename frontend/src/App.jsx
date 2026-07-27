@@ -6,7 +6,6 @@ import Homepage from './pages/Homepage';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
-import QuestionCuration from './components/Questioncuration';
 import ProtectedRoute from './components/ProtectedRoute'
 import './App.css';
 
@@ -30,7 +29,6 @@ function App() {
       {/* PRIVATE ROUTES: Guarded by ProtectedRoute */}
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/quizcreate" element={<QuestionCuration />} />
       </Route>
     </Routes>
   );

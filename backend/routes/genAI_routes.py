@@ -38,11 +38,9 @@ async def upload_document_endpoint(
     file: UploadFile = File(...),
     user_id: uuid.UUID = Form(...),
     course_id: uuid.UUID = Form(None),
+    custom_name: str = Form(None), # Added custom_name
     db: asyncpg.Connection = Depends(get_db)  
 ):
-    """
-    Receives a file upload, saves it temporarily, and triggers the RAG ingestion pipeline.
-    """
     # 1. Validate file extension early
     extension = os.path.splitext(file.filename)[1].lower()
     if extension not in ALLOWED_FILE_TYPES:
@@ -51,46 +49,44 @@ async def upload_document_endpoint(
             detail=f"Unsupported file type: {extension}. Allowed types: {ALLOWED_FILE_TYPES}"
         )
 
+    # Determine final filename (fallback to original file name if custom is empty)
+    final_filename = custom_name.strip() if custom_name and custom_name.strip() else file.filename
+
     # 2. Generate a secure temporary file path
     temp_filename = f"{uuid.uuid4()}{extension}"
     temp_file_path = os.path.join(TEMP_UPLOAD_DIR, temp_filename)
 
     try:
         # 3. Save the uploaded file to disk synchronously
-        # We use shutil.copyfileobj as it safely handles large files without blowing up memory
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # 4. Pass the physical file path to your RAG controller
+        # 4. Pass the physical file path AND the custom filename to your controller
         document_id = await initialize_document(
             file_path=temp_file_path,
             user_id=user_id,
             course_id=course_id,
+            filename=final_filename, # ADD THIS PARAMETER
             db=db
         )
 
         return {
             "document_id": document_id,
-            "filename": file.filename,
+            "filename": final_filename,
             "message": "Document processed and stored in vector database successfully."
         }
 
     except Exception as e:
-        # If the controller throws an HTTPException, raise it directly
         if isinstance(e, HTTPException):
             raise e
-        # Otherwise, wrap it in a 500 error
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process document: {str(e)}"
         )
 
     finally:
-        # 5. Clean up: ALWAYS delete the temporary file after processing, 
-        # even if an error occurred above.
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
-
 
 
 @genAI_router.post("/generate/standard")

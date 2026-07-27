@@ -1,5 +1,5 @@
 # controllers/quiz_controller.py
-
+import json
 import asyncpg
 import uuid
 from fastapi import HTTPException, status
@@ -82,15 +82,18 @@ class QuizSummaryResponse(BaseModel):
 # ============================================================
 
 def _format_question(row: asyncpg.Record) -> QuestionResponse:
+
+    raw_options = row["options"]
+    parsed_options = json.loads(raw_options) if isinstance(raw_options, str) else raw_options
+
     return QuestionResponse(
         question_id=str(row["question_id"]),
         quiz_id=str(row["quiz_id"]),
         question=row["question"],
         question_type=row["question_type"],
-        options=dict(row["options"]),
+        options=parsed_options,         
         correct_answer=row["correct_answer"],
         explanation=row["explanation"],
-     
     )
 
 
@@ -199,7 +202,7 @@ async def save_quiz(
                     quiz_id,
                     q.question,
                     q.question_type,
-                    dict(q.options),
+                    json.dumps(q.options),
                     q.correct_answer,
                     q.explanation,
                 )

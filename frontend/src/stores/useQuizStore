@@ -1,0 +1,151 @@
+import { create } from "zustand";
+import axiosInstance from "../util/axiosInstance";
+import { toast } from "react-hot-toast";
+
+export const useQuizStore = create((set, get) => ({
+  generatedQuestions: [],
+  isGenerating: false,
+  isSaving: false,
+  error: null,
+
+  // Manually set/replace the current in-progress question list
+  // (used by the review screen when the user removes a question)
+  setGeneratedQuestions: (questions) => set({ generatedQuestions: questions }),
+
+  clearGeneratedQuestions: () => set({ generatedQuestions: [], error: null }),
+
+  // Generate a quiz purely from the LLM's internal knowledge (no document)
+  // Backend: POST /quiz/generate/standard
+  generateStandardQuiz: async ({ topic, numQuestions, difficulty, questionType }) => {
+    set({ isGenerating: true, error: null });
+    try {
+      const res = await axiosInstance.post("/quiz/generate/standard", {
+        topic,
+        num_questions: numQuestions,
+        difficulty,
+        question_type: questionType,
+      });
+
+      const questions = res.data?.questions || [];
+      set({ generatedQuestions: questions, isGenerating: false });
+      toast.success(`Generated ${questions.length} question${questions.length !== 1 ? "s" : ""}`);
+      return questions;
+    } catch (error) {
+      const errMsg = error.response?.data?.detail || "Failed to generate quiz";
+      set({ isGenerating: false, error: errMsg });
+      toast.error(errMsg);
+      throw error;
+    }
+  },
+
+  // Generate a quiz grounded in a specific document via RAG
+  // Backend: POST /quiz/generate/document
+  generateDocumentQuiz: async ({ documentId, userId, topic, numQuestions, difficulty, questionType }) => {
+    set({ isGenerating: true, error: null });
+    try {
+      const res = await axiosInstance.post("/quiz/generate/document", {
+        document_id: documentId,
+        user_id: userId,
+        topic,
+        num_questions: numQuestions,
+        difficulty,
+        question_type: questionType,
+      });
+
+      const questions = res.data?.questions || [];
+      set({ generatedQuestions: questions, isGenerating: false });
+      toast.success(`Generated ${questions.length} question${questions.length !== 1 ? "s" : ""}`);
+      return questions;
+    } catch (error) {
+      const errMsg = error.response?.data?.detail || "Failed to generate quiz from document";
+      set({ isGenerating: false, error: errMsg });
+      toast.error(errMsg);
+      throw error;
+    }
+  },
+
+  // Persist the (possibly trimmed) generated question set as a real quiz
+  // Backend: POST /quizzes/
+  saveQuiz: async ({ userId, courseId, documentId, quizType, topic, difficulty, questions }) => {
+    set({ isSaving: true, error: null });
+    try {
+      const res = await axiosInstance.post("/quizzes/", {
+        user_id: userId,
+        course_id: courseId,
+        document_id: documentId,
+        quiz_type: quizType,
+        topic,
+        difficulty,
+        questions,
+      });
+
+      set({ isSaving: false });
+      toast.success("Quiz saved successfully!");
+      return res.data;
+    } catch (error) {
+      const errMsg = error.response?.data?.detail || "Failed to save quiz";
+      set({ isSaving: false, error: errMsg });
+      toast.error(errMsg);
+      throw error;
+    }
+  },
+
+  // Fetch a single quiz by id (handy for a "take quiz" / "view quiz" screen)
+  // Backend: GET /quizzes/{quiz_id}
+  getQuizById: async (quizId) => {
+    set({ error: null });
+    try {
+      const res = await axiosInstance.get(`/quizzes/${quizId}`);
+      return res.data;
+    } catch (error) {
+      const errMsg = error.response?.data?.detail || "Failed to load quiz";
+      toast.error(errMsg);
+      return null;
+    }
+  },
+
+  // Fetch all quizzes for a user
+  // Backend: GET /quizzes/user/{user_id}
+  getQuizzesByUser: async (userId) => {
+    set({ error: null });
+    try {
+      const res = await axiosInstance.get(`/quizzes/user/${userId}`);
+      return res.data || [];
+    } catch (error) {
+      const errMsg = error.response?.data?.detail || "Failed to load quizzes";
+      toast.error(errMsg);
+      return [];
+    }
+  },
+
+  // Fetch all quizzes for a course
+  // Backend: GET /quizzes/course/{course_id}
+  getQuizzesByCourse: async (courseId) => {
+    set({ error: null });
+    try {
+      const res = await axiosInstance.get(`/quizzes/course/${courseId}`);
+      return res.data || [];
+    } catch (error) {
+      const errMsg = error.response?.data?.detail || "Failed to load quizzes";
+      toast.error(errMsg);
+      return [];
+    }
+  },
+
+  // Delete a quiz
+  // Backend: DELETE /quizzes/{quiz_id}
+  deleteQuiz: async (quizId) => {
+    set({ error: null });
+    try {
+      await axiosInstance.delete(`/quizzes/${quizId}`);
+      toast.success("Quiz deleted successfully");
+      return true;
+    } catch (error) {
+      const errMsg = error.response?.data?.detail || "Failed to delete quiz";
+      toast.error(errMsg);
+      return false;
+    }
+  },
+}));
+
+export default useQuizStore;

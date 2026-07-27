@@ -58,12 +58,14 @@ const Homepage = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-            <button className="px-8 py-4 text-base font-semibold rounded-full bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/20 flex items-center justify-center">
+            <Link to={"/dashboard"}>
+               <button className="px-8 py-4 text-base font-semibold rounded-full bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/20 flex items-center justify-center">
               Start generating <span className="ml-2 font-normal">›</span>
             </button>
-            <button className="px-8 py-4 text-base font-semibold rounded-full border-2 border-gray-500/50 bg-gray-800/30 backdrop-blur-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-all">
-              Watch a demo
-            </button>
+            
+            </Link>
+         
+          
           </div>
         </div>
 

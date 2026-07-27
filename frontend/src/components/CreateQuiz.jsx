@@ -1,37 +1,64 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, FileText, Type, UploadCloud, ArrowLeft, Settings2, FileUp, X, BookOpen, ChevronDown, Database } from 'lucide-react';
+import {
+  Sparkles, FileText, Type, UploadCloud, ArrowLeft, Settings2, FileUp, X,
+  BookOpen, ChevronDown, Database, Loader2,
+} from 'lucide-react';
+import { useQuizStore } from '../stores/useQuizStore';
+import { useDocumentsStore } from '../stores/useDocumentStore';
+import { useUserStore } from '../stores/useUserStore';
+import { useCourseStore } from '../stores/useCourseStore';
+import QuizCuration from './QuizCuration';
+
+const THEMES = {
+  upload: {
+    text: 'text-blue-400',
+    chip: 'bg-blue-500/10 border-blue-500/30 text-blue-300',
+    bg: 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/20',
+    solidBtn: 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/20',
+    stat: 'text-blue-400',
+  },
+  existing: {
+    text: 'text-emerald-400',
+    chip: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
+    bg: 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20',
+    solidBtn: 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20',
+    stat: 'text-emerald-400',
+  },
+  topic: {
+    text: 'text-purple-400',
+    chip: 'bg-purple-500/10 border-purple-500/30 text-purple-300',
+    bg: 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20',
+    solidBtn: 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20',
+    stat: 'text-purple-400',
+  },
+};
 
 const CreateQuiz = () => {
-  const [mode, setMode] = useState('select'); // 'select' | 'upload' | 'topic' | 'existing'
+  const [mode, setMode] = useState('select');
+  const [submittedMode, setSubmittedMode] = useState(null);
+  const [activeDocumentId, setActiveDocumentId] = useState(null);
+  const [reviewQuestions, setReviewQuestions] = useState([]);
 
-  // Form States
-  const [courses, setCourses] = useState([]);
-  const [documents, setDocuments] = useState([]); // Added to hold existing documents
-  
+  // Form state
   const [selectedCourse, setSelectedCourse] = useState('');
-  const [selectedDocument, setSelectedDocument] = useState(''); // Added for existing mode
+  const [selectedDocument, setSelectedDocument] = useState('');
   const [topic, setTopic] = useState('');
   const [difficulty, setDifficulty] = useState('medium');
+  const [questionType, setQuestionType] = useState('mcq');
   const [questionCount, setQuestionCount] = useState(10);
   const [file, setFile] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
 
-  // Fetch educator's courses and existing documents on mount
+  const user = useUserStore((state) => state.user);
+  const userId = user?.user_id;
+
+  const { courses, fetchCourses } = useCourseStore();
+  const { documents, isUploading, fetchDocuments, uploadDocument } = useDocumentsStore();
+  const { isGenerating, isSaving, generateStandardQuiz, generateDocumentQuiz, saveQuiz } = useQuizStore();
+
   useEffect(() => {
-    // Mock courses
-    setCourses([
-      { id: 1, title: 'Introduction to Computer Science', code: 'CS101' },
-      { id: 2, title: 'Data Structures & Algorithms', code: 'CS201' },
-      { id: 3, title: 'Cellular & Molecular Biology', code: 'BIO301' },
-    ]);
-
-    // Mock previously uploaded documents
-    setDocuments([
-      { id: 1, filename: 'CS201_Syllabus_Fall2026.pdf', courseCode: 'CS201' },
-      { id: 2, filename: 'Lecture_4_Trees_and_Graphs.docx', courseCode: 'CS201' },
-      { id: 3, filename: 'Cell_Division_Notes_Ch5.pdf', courseCode: 'BIO301' },
-    ]);
-  }, []);
+    fetchCourses();
+    fetchDocuments();
+  }, [fetchCourses, fetchDocuments]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -41,39 +68,104 @@ const CreateQuiz = () => {
 
   const clearFile = () => setFile(null);
 
-  const handleGenerate = (e) => {
+  const resetAll = () => {
+    setMode('select');
+    setSubmittedMode(null);
+    setActiveDocumentId(null);
+    setReviewQuestions([]);
+    setFile(null);
+    setSelectedDocument('');
+    setTopic('');
+  };
+
+  const handleGenerate = async (e) => {
     e.preventDefault();
-    setIsGenerating(true);
-    
-    // TODO: Wire up your FastAPI RAG or LLM endpoint here
-    const payload = {
-      courseId: selectedCourse,
-      mode,
-      topic,
-      difficulty,
-      questionCount,
-      file: mode === 'upload' && file ? file.name : null,
-      documentId: mode === 'existing' ? selectedDocument : null
-    };
-    
-    console.log("Generating with payload:", payload);
+    if (!userId) {
+      alert('You must be logged in to generate a quiz.');
+      return;
+    }
 
-    setTimeout(() => {
-      setIsGenerating(false);
-      alert("Generation complete! (Placeholder)");
-    }, 2000);
+    const currentMode = mode;
+    setSubmittedMode(currentMode);
+
+    try {
+      let result = [];
+      let docId = null;
+
+      if (currentMode === 'topic') {
+        result = await generateStandardQuiz({
+          topic,
+          numQuestions: Number(questionCount),
+          difficulty,
+          questionType,
+        });
+      } else if (currentMode === 'existing') {
+        docId = selectedDocument;
+        result = await generateDocumentQuiz({
+          documentId: docId,
+          userId,
+          topic,
+          numQuestions: Number(questionCount),
+          difficulty,
+          questionType,
+        });
+      } else if (currentMode === 'upload') {
+        const uploadResult = await uploadDocument(file, userId, null, selectedCourse || null);
+        docId = uploadResult.document_id;
+        result = await generateDocumentQuiz({
+          documentId: docId,
+          userId,
+          topic,
+          numQuestions: Number(questionCount),
+          difficulty,
+          questionType,
+        });
+      }
+
+      setActiveDocumentId(docId);
+      setReviewQuestions(result);
+      setMode('review');
+    } catch (err) {}
   };
 
-  // Determine active theme colors based on mode
-  const getTheme = () => {
-    if (mode === 'upload') return { color: 'blue', text: 'text-blue-400', bg: 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/20' };
-    if (mode === 'existing') return { color: 'emerald', text: 'text-emerald-400', bg: 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20' };
-    return { color: 'purple', text: 'text-purple-400', bg: 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20' };
+  const handleSaveQuiz = async (payload) => {
+    try {
+      await saveQuiz({ userId, ...payload });
+      resetAll();
+    } catch (err) {}
   };
-  
-  const theme = getTheme();
 
-  // ── VIEW 1: SELECTION SCREEN ─────────────────────────────────────────────
+  const isBusy = isGenerating || isUploading;
+  const theme = THEMES[mode === 'review' ? submittedMode : mode] || THEMES.topic;
+
+
+  const filteredDocuments = selectedCourse
+    ? documents.filter((doc) => !doc.course_id || String(doc.course_id) === String(selectedCourse))
+    : documents;
+
+  if (mode === 'review') {
+    return (
+      <QuizCuration
+        submittedMode={submittedMode}
+        initialQuestions={reviewQuestions}
+        initialTopic={topic}
+        initialDifficulty={difficulty}
+        initialQuestionType={questionType}
+        initialCourseId={selectedCourse}
+        initialDocumentId={activeDocumentId}
+        courses={courses}
+        documents={documents}
+        userId={userId}
+        generateStandardQuiz={generateStandardQuiz}
+        generateDocumentQuiz={generateDocumentQuiz}
+        isSaving={isSaving}
+        theme={theme}
+        onDiscard={resetAll}
+        onSave={handleSaveQuiz}
+      />
+    );
+  }
+
   if (mode === 'select') {
     return (
       <div className="max-w-6xl mx-auto animate-fade-in-up">
@@ -84,8 +176,7 @@ const CreateQuiz = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {/* Upload New File Option */}
-          <button 
+          <button
             onClick={() => setMode('upload')}
             className="group flex flex-col items-center text-center rounded-3xl p-8 border border-gray-500/30 bg-gray-800/40 backdrop-blur-md hover:border-blue-500/50 hover:bg-gray-800/80 transition-all duration-300 shadow-xl"
           >
@@ -98,8 +189,7 @@ const CreateQuiz = () => {
             </p>
           </button>
 
-          {/* Existing Document Option */}
-          <button 
+          <button
             onClick={() => setMode('existing')}
             className="group flex flex-col items-center text-center rounded-3xl p-8 border border-gray-500/30 bg-gray-800/40 backdrop-blur-md hover:border-emerald-500/50 hover:bg-gray-800/80 transition-all duration-300 shadow-xl"
           >
@@ -112,8 +202,7 @@ const CreateQuiz = () => {
             </p>
           </button>
 
-          {/* Topic Only Option */}
-          <button 
+          <button
             onClick={() => setMode('topic')}
             className="group flex flex-col items-center text-center rounded-3xl p-8 border border-gray-500/30 bg-gray-800/40 backdrop-blur-md hover:border-purple-500/50 hover:bg-gray-800/80 transition-all duration-300 shadow-xl"
           >
@@ -130,16 +219,13 @@ const CreateQuiz = () => {
     );
   }
 
-  // ── VIEW 2: FORM CONTROLS ──────────────────────────────
-  
-  // Logic to determine if the form is valid to submit
-  const isSubmitDisabled = isGenerating || 
-    (mode === 'upload' && !file) || 
-    (mode === 'existing' && !selectedDocument);
+  const isSubmitDisabled = isBusy ||
+    (mode === 'upload' && !file) ||
+    (mode === 'existing' && !selectedDocument) ||
+    (mode === 'topic' && !topic.trim());
 
   return (
     <div className="max-w-4xl mx-auto animate-fade-in-up pb-20">
-      {/* Back Navigation */}
       <button
         onClick={() => {
           setMode('select');
@@ -159,7 +245,6 @@ const CreateQuiz = () => {
           {mode === 'upload' && <FileUp className={theme.text} />}
           {mode === 'existing' && <Database className={theme.text} />}
           {mode === 'topic' && <Type className={theme.text} />}
-          
           {mode === 'upload' && 'Upload Course Material'}
           {mode === 'existing' && 'Select Knowledge Base Document'}
           {mode === 'topic' && 'Define Quiz Topic'}
@@ -167,7 +252,6 @@ const CreateQuiz = () => {
       </div>
 
       <form onSubmit={handleGenerate} className="space-y-8">
-        
         {/* Course Assignment */}
         <div className="bg-gray-800/40 backdrop-blur-md border border-gray-500/30 rounded-3xl p-8 shadow-xl">
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
@@ -184,8 +268,8 @@ const CreateQuiz = () => {
               >
                 <option value="" disabled className="bg-gray-800 text-gray-400">-- Select a Course --</option>
                 {courses.map((course) => (
-                  <option key={course.id} value={course.id} className="bg-gray-800 text-white">
-                    {course.code} - {course.title}
+                  <option key={course.course_id} value={course.course_id} className="bg-gray-800 text-white">
+                    {course.course_name}
                   </option>
                 ))}
               </select>
@@ -207,17 +291,20 @@ const CreateQuiz = () => {
                   required
                   value={selectedDocument}
                   onChange={(e) => setSelectedDocument(e.target.value)}
-                  className={`w-full bg-gray-900/50 border border-gray-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-${theme.color}-500 transition-colors appearance-none cursor-pointer`}
+                  className="w-full bg-gray-900/50 border border-gray-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors appearance-none cursor-pointer"
                 >
                   <option value="" disabled className="bg-gray-800 text-gray-400">-- Select a Document --</option>
-                  {documents.map((doc) => (
-                    <option key={doc.id} value={doc.id} className="bg-gray-800 text-white">
-                      {doc.filename} ({doc.courseCode})
+                  {filteredDocuments.map((doc) => (
+                    <option key={doc.document_id} value={doc.document_id} className="bg-gray-800 text-white">
+                      {doc.filename} {doc.course_id ? '' : '(Global)'}
                     </option>
                   ))}
                 </select>
                 <ChevronDown size={18} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
+              {filteredDocuments.length === 0 && (
+                <p className="text-xs text-gray-500 ml-1">No documents found. Try uploading a new one instead.</p>
+              )}
             </div>
           </div>
         )}
@@ -228,7 +315,7 @@ const CreateQuiz = () => {
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
               <UploadCloud size={20} className={theme.text} /> Upload Document
             </h2>
-            
+
             {!file ? (
               <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-600/50 rounded-2xl hover:border-blue-500/50 hover:bg-gray-800/50 transition-all cursor-pointer">
                 <UploadCloud size={36} className="text-gray-400 mb-3" />
@@ -258,26 +345,29 @@ const CreateQuiz = () => {
         {/* Configuration Settings */}
         <div className="bg-gray-800/40 backdrop-blur-md border border-gray-500/30 rounded-3xl p-8 shadow-xl">
           <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-            <Settings2 size={20} className={theme.text} /> 
+            <Settings2 size={20} className={theme.text} />
             Quiz Settings
           </h2>
-          
+
           <div className="space-y-6">
             {/* Topic Input */}
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-300 ml-1">
-                {mode === 'topic' ? 'What is the quiz about?' : 'Specific focus (Optional)'}
+                {mode === 'topic' ? 'What is the quiz about?' : 'Focus / topic for retrieval'}
               </label>
               <textarea
-                required={mode === 'topic'}
+                required
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                className={`w-full bg-gray-900/50 border border-gray-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-${theme.color}-500 focus:ring-1 focus:ring-${theme.color}-500 transition-colors placeholder-gray-500 h-24 resize-none`}
-                placeholder={mode === 'topic' ? 'e.g., Advanced JavaScript concepts, closures, and promises...' : 'e.g., Focus specifically on chapters 3 and 4...'}
+                className="w-full bg-gray-900/50 border border-gray-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors placeholder-gray-500 h-24 resize-none"
+                placeholder={mode === 'topic' ? 'e.g., Advanced JavaScript concepts, closures, and promises...' : 'e.g., graph traversal algorithms, chapters 3 and 4...'}
               />
+              {mode !== 'topic' && (
+                <p className="text-xs text-gray-500 ml-1">Used to retrieve the most relevant chunks from the document.</p>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Difficulty */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-300 ml-1">Difficulty Level</label>
@@ -285,7 +375,7 @@ const CreateQuiz = () => {
                   <select
                     value={difficulty}
                     onChange={(e) => setDifficulty(e.target.value)}
-                    className={`w-full bg-gray-900/50 border border-gray-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-${theme.color}-500 transition-colors appearance-none cursor-pointer`}
+                    className="w-full bg-gray-900/50 border border-gray-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors appearance-none cursor-pointer"
                   >
                     <option value="easy" className="bg-gray-800 text-white">Beginner / Easy</option>
                     <option value="medium" className="bg-gray-800 text-white">Intermediate / Medium</option>
@@ -295,21 +385,37 @@ const CreateQuiz = () => {
                 </div>
               </div>
 
+              {/* Question Type */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-300 ml-1">Question Type</label>
+                <div className="relative">
+                  <select
+                    value={questionType}
+                    onChange={(e) => setQuestionType(e.target.value)}
+                    className="w-full bg-gray-900/50 border border-gray-600/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors appearance-none cursor-pointer"
+                  >
+                    <option value="mcq" className="bg-gray-800 text-white">Multiple Choice</option>
+                    <option value="true_false" className="bg-gray-800 text-white">True / False</option>
+                  </select>
+                  <ChevronDown size={18} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
               {/* Number of Questions */}
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-300 ml-1">Number of Questions: {questionCount}</label>
+                <label className="text-sm font-semibold text-gray-300 ml-1">Questions: {questionCount}</label>
                 <input
                   type="range"
                   min="5"
-                  max="30"
-                  step="5"
+                  max="20"
+                  step="1"
                   value={questionCount}
                   onChange={(e) => setQuestionCount(e.target.value)}
-                  className={`w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-${theme.color}-500 mt-3`}
+                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500 mt-3"
                 />
                 <div className="flex justify-between text-xs text-gray-500 px-1">
                   <span>5</span>
-                  <span>30</span>
+                  <span>20</span>
                 </div>
               </div>
             </div>
@@ -323,8 +429,11 @@ const CreateQuiz = () => {
             disabled={isSubmitDisabled}
             className={`px-8 py-4 text-sm font-bold rounded-full shadow-lg transition-all flex items-center gap-2 ${theme.bg} text-white disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            {isGenerating ? (
-              <span className="animate-pulse flex items-center gap-2">Generating...</span>
+            {isBusy ? (
+              <span className="animate-pulse flex items-center gap-2">
+                <Loader2 size={18} className="animate-spin" />
+                {isUploading ? 'Uploading...' : 'Generating...'}
+              </span>
             ) : (
               <>
                 <Sparkles size={18} /> Generate Quiz

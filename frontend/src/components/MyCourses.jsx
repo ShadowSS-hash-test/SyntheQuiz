@@ -2,28 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, FileText, Download, Eye, BookOpen, CheckCircle2, X, Loader2 } from 'lucide-react';
 import useCourseStore from '../stores/useCourseStore'; 
 import useUserStore from '../stores/useUserStore'; 
+import useQuizStore from '../stores/useQuizStore'; // Added Quiz Store import
 
 const MyCourses = () => {
   // ─── UI NAVIGATION STATE ──────────────────────────────────────────────────
-  // Tracks which specific course or quiz the user is currently viewing.
-  // If null, the user is looking at the top-level list.
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
 
   // ─── MODAL & FORM STATE ───────────────────────────────────────────────────
-  // Controls the visibility of the "Create Course" modal and stores the form input.
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newCourseName, setNewCourseName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ─── GLOBAL STORES ────────────────────────────────────────────────────────
-  const { courses, fetchCourses, createCourse, loading } = useCourseStore();
-  
-  // We need the user object to attach their UUID as the course_coordinator
-  // to satisfy your FastAPI backend's CreateCourseRequest schema.
-  const { user } = useUserStore();
+  // ─── LOADING STATES FOR QUIZZES ───────────────────────────────────────────
+  const [isFetchingQuizzes, setIsFetchingQuizzes] = useState(false);
+  const [isFetchingQuizDetails, setIsFetchingQuizDetails] = useState(false);
 
-  // ─── MOCK DATA STATE (Temporary) ──────────────────────────────────────────
+  // ─── GLOBAL STORES ────────────────────────────────────────────────────────
+  const { courses, fetchCourses, createCourse, loading: coursesLoading } = useCourseStore();
+  const { user } = useUserStore();
+  const { getQuizzesByCourse, getQuizById } = useQuizStore(); // Pulling API methods
+
+  // ─── LOCAL DATA STATE ─────────────────────────────────────────────────────
   const [quizzes, setQuizzes] = useState([]);
   const [quizDetails, setQuizDetails] = useState(null);
 
@@ -34,24 +34,18 @@ const MyCourses = () => {
 
   // ─── HANDLERS ─────────────────────────────────────────────────────────────
 
-  /**
-   * Handles the form submission to create a new course.
-   * We pass both the typed name and the logged-in user's ID to the store.
-   */
   const handleCreateCourse = async (e) => {
-    e.preventDefault(); // Prevents the browser from refreshing on form submit
+    e.preventDefault(); 
     
-    if (!newCourseName.trim()) return; // Don't submit empty strings
+    if (!newCourseName.trim()) return; 
 
     setIsSubmitting(true);
 
-    // Call the Zustand store action to hit the FastAPI backend
     const newCourse = await createCourse({
       course_name: newCourseName,
       course_coordinator: user.user_id 
     });
 
-    // If successful (newCourse is not null), reset the UI state
     if (newCourse) {
       setIsCreateModalOpen(false);
       setNewCourseName('');
@@ -60,37 +54,28 @@ const MyCourses = () => {
     setIsSubmitting(false);
   };
 
-  const handleCourseClick = (course) => {
+  // Fetch the summary list of quizzes for the selected course
+  const handleCourseClick = async (course) => {
     setSelectedCourse(course);
-    // TODO: Replace with actual fetchQuizzesByCourseId when useQuizStore is built
-    setQuizzes([
-      { id: 101, title: 'Midterm Prep: Arrays & Linked Lists', date: '2026-07-15', questionCount: 2 },
-      { id: 102, title: 'Pop Quiz: Big O Notation & Recursion', date: '2026-07-20', questionCount: 10 },
-    ]);
+    setIsFetchingQuizzes(true);
+    
+    const fetchedQuizzes = await getQuizzesByCourse(course.course_id);
+    setQuizzes(fetchedQuizzes || []);
+    
+    setIsFetchingQuizzes(false);
   };
 
-  const handleQuizClick = (quiz) => {
-    setSelectedQuiz(quiz);
-    // TODO: Replace with actual fetchQuizDetails when useQuizStore is built
-    setQuizDetails({
-      ...quiz,
-      questions: [
-        {
-          id: 1,
-          type: 'mcq',
-          question: 'What is the time complexity of accessing an element in an array by index?',
-          options: { A: 'O(n)', B: 'O(log n)', C: 'O(1)', D: 'O(n^2)' },
-          correct_answer: 'C'
-        },
-        {
-          id: 2,
-          type: 'true_false',
-          question: 'A linked list allows for constant time O(1) insertions at the end of the list if you do not have a tail pointer.',
-          options: { T: 'True', F: 'False' },
-          correct_answer: 'F'
-        }
-      ]
-    });
+  // Fetch the full details (including questions) for the selected quiz
+  const handleQuizClick = async (quiz) => {
+    setIsFetchingQuizDetails(true);
+    
+    const fullQuiz = await getQuizById(quiz.quiz_id);
+    if (fullQuiz) {
+      setQuizDetails(fullQuiz);
+      setSelectedQuiz(fullQuiz);
+    }
+    
+    setIsFetchingQuizDetails(false);
   };
 
   // ─── VIEW 3: QUIZ DETAILS ─────────────────────────────────────────────────
@@ -98,7 +83,10 @@ const MyCourses = () => {
     return (
       <div className="max-w-4xl mx-auto animate-fade-in-up pb-20">
         <button
-          onClick={() => setSelectedQuiz(null)}
+          onClick={() => {
+            setSelectedQuiz(null);
+            setQuizDetails(null);
+          }}
           className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-blue-400 hover:text-blue-300 transition-colors"
         >
           <ArrowLeft size={16} /> Back to {selectedCourse.course_name}
@@ -107,8 +95,18 @@ const MyCourses = () => {
         {/* Header Section */}
         <div className="flex justify-between items-end mb-8">
           <div>
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Generated {quizDetails.date}</span>
-            <h1 className="text-3xl font-bold text-white mt-1">{quizDetails.title}</h1>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+              Generated {new Date(quizDetails.created_at).toLocaleDateString()}
+            </span>
+            <h1 className="text-3xl font-bold text-white mt-1 capitalize">{quizDetails.topic}</h1>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded-md border border-gray-700 capitalize">
+                {quizDetails.difficulty} Difficulty
+              </span>
+              <span className="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded-md border border-gray-700 capitalize">
+                {quizDetails.quiz_type === 'rag' ? 'Document Grounded' : 'Topic Generated'}
+              </span>
+            </div>
           </div>
           <button className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-full shadow-lg shadow-blue-500/20 hover:bg-blue-500 transition-all flex items-center gap-2">
             <Download size={16} /> Export PDF
@@ -118,17 +116,17 @@ const MyCourses = () => {
         {/* Render Questions List */}
         <div className="space-y-4">
           {quizDetails.questions.map((q, idx) => (
-            <div key={q.id} className="bg-gray-800/40 backdrop-blur-md border border-gray-600/30 rounded-2xl p-6">
+            <div key={q.question_id} className="bg-gray-800/40 backdrop-blur-md border border-gray-600/30 rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xs font-bold text-gray-500">Q{idx + 1}</span>
                 <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border bg-gray-700/40 border-gray-600/40 text-gray-300">
-                  {q.type === 'mcq' ? 'Multiple Choice' : 'True / False'}
+                  {q.question_type === 'mcq' ? 'Multiple Choice' : 'True / False'}
                 </span>
               </div>
               
               <p className="text-white font-semibold mb-4">{q.question}</p>
               
-              <div className={`grid gap-2 ${q.type === 'true_false' ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
+              <div className={`grid gap-2 ${q.question_type === 'true_false' ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
                 {Object.entries(q.options).map(([key, label]) => {
                   const isCorrect = key === q.correct_answer;
                   return (
@@ -149,6 +147,14 @@ const MyCourses = () => {
                   );
                 })}
               </div>
+
+              {/* Optional: Render explanation if it exists */}
+              {q.explanation && (
+                <div className="mt-4 p-3 bg-blue-900/10 border border-blue-500/20 rounded-xl text-sm text-blue-200">
+                  <span className="font-bold block mb-1">Explanation:</span>
+                  {q.explanation}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -161,7 +167,10 @@ const MyCourses = () => {
     return (
       <div className="max-w-6xl mx-auto animate-fade-in-up">
         <button
-          onClick={() => setSelectedCourse(null)}
+          onClick={() => {
+            setSelectedCourse(null);
+            setQuizzes([]);
+          }}
           className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-blue-400 hover:text-blue-300 transition-colors"
         >
           <ArrowLeft size={16} /> Back to My Courses
@@ -170,7 +179,6 @@ const MyCourses = () => {
         {/* Course Header */}
         <div className="mb-10 bg-gray-800/40 backdrop-blur-md border border-gray-500/30 rounded-3xl p-8 shadow-xl">
           <span className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold rounded-full uppercase tracking-wider">
-            {/* Taking the first chunk of the UUID to act as a visual Course Code */}
             {selectedCourse.course_id.split('-')[0]} 
           </span>
           <h1 className="text-3xl lg:text-4xl font-bold text-white mt-3">
@@ -189,24 +197,37 @@ const MyCourses = () => {
           </div>
 
           <div className="divide-y divide-gray-700/50">
-            {quizzes.length > 0 ? (
+            {isFetchingQuizzes ? (
+              <div className="px-8 py-12 text-center flex flex-col items-center gap-3 text-gray-400">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                Loading quizzes...
+              </div>
+            ) : quizzes.length > 0 ? (
               quizzes.map((quiz) => (
-                <div key={quiz.id} className="px-8 py-6 hover:bg-gray-800/60 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div key={quiz.quiz_id} className="px-8 py-6 hover:bg-gray-800/60 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h3 className="font-bold text-white text-base">{quiz.title}</h3>
+                    <h3 className="font-bold text-white text-base capitalize">{quiz.topic}</h3>
                     <div className="flex items-center gap-4 text-xs text-gray-400 mt-1">
-                      <span>Generated: {quiz.date}</span>
+                      <span>Generated: {new Date(quiz.created_at).toLocaleDateString()}</span>
                       <span>•</span>
-                      <span>{quiz.questionCount} Questions</span>
+                      <span className="capitalize">{quiz.difficulty}</span>
+                      <span>•</span>
+                      <span className="capitalize">{quiz.quiz_type === 'rag' ? 'Document-Based' : 'General Topic'}</span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3 shrink-0">
                     <button 
                       onClick={() => handleQuizClick(quiz)}
-                      className="px-4 py-2 text-xs font-semibold rounded-full bg-gray-800/80 border border-gray-600/50 text-gray-300 hover:bg-gray-700 hover:text-white transition-all flex items-center gap-2"
+                      disabled={isFetchingQuizDetails}
+                      className="px-4 py-2 text-xs font-semibold rounded-full bg-gray-800/80 border border-gray-600/50 text-gray-300 hover:bg-gray-700 hover:text-white transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Eye size={14} /> Preview
+                      {isFetchingQuizDetails && selectedQuiz?.quiz_id === quiz.quiz_id ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Eye size={14} />
+                      )}
+                      Preview
                     </button>
                     <button className="px-4 py-2 text-xs font-semibold rounded-full bg-blue-600 text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/20 flex items-center gap-2">
                       <Download size={14} /> Export
@@ -229,19 +250,15 @@ const MyCourses = () => {
   return (
     <div className="max-w-6xl mx-auto animate-fade-in-up relative">
       
-      {/* ── CREATE COURSE MODAL OVERLAY ── 
-          Rendered conditionally over the whole screen using fixed positioning.
-          The backdrop-blur creates a glass effect over the dashboard.
-      */}
+      {/* ── CREATE COURSE MODAL OVERLAY ── */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-3xl p-8 w-full max-w-md shadow-2xl relative animate-fade-in-up">
             
-            {/* Close Button */}
             <button 
               onClick={() => {
                 setIsCreateModalOpen(false);
-                setNewCourseName(''); // Clear input if user cancels
+                setNewCourseName(''); 
               }}
               className="absolute top-6 right-6 text-gray-500 hover:text-gray-300 transition-colors"
             >
@@ -295,7 +312,7 @@ const MyCourses = () => {
       </div>
 
       {/* Display States */}
-      {loading && courses.length === 0 ? (
+      {coursesLoading && courses.length === 0 ? (
         <div className="text-center py-20 text-gray-400 flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           Loading courses...

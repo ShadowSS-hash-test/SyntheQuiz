@@ -4,7 +4,7 @@ from db.connectDB import get_db
 from controllers.user_controllers import (
     register_user, login_user, get_user_by_id,
     update_user, delete_user, logout_user,
-    RegisterRequest, LoginRequest, UpdateUserRequest
+    RegisterRequest, LoginRequest, UpdateUserRequest, refresh_access_token
 )
 from middleware.authCheck import (verify_user_token)
  

@@ -2,7 +2,7 @@ import React from 'react';
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, Info } from 'lucide-react';
 
 const QuestionCard = ({ q, index, theme, hasExplanation, expanded, onToggleKeep, onToggleExplanation }) => {
-  const isTrueFalse = q.type === 'true_false';
+  const isTrueFalse = q.question_type === 'true_false';
 
   return (
     <div

@@ -1,14 +1,23 @@
 import React from 'react';
 import { BookOpen, Sparkles, User, LogOut, Database } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import useUserStore from '../stores/useUserStore';
 
 const Sidebar = ({ activeTab, setActiveTab }) => {
+  const navigate = useNavigate();
+  const { logout } = useUserStore();
+
   const navItems = [
     { id: 'courses', label: 'My Courses', icon: BookOpen },
     { id: 'create-quiz', label: 'Create a Quiz', icon: Sparkles },
     { id: 'documents', label: 'Documents', icon: Database },
     { id: 'profile', label: 'Profile', icon: User },
   ];
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   return (
     <aside className="w-64 bg-gray-800/40 backdrop-blur-md border-r border-gray-500/30 h-screen flex flex-col justify-between p-6 shrink-0">
@@ -45,7 +54,10 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
 
       {/* Logout Button */}
       <div className="pt-6 border-t border-gray-700/50">
-        <button className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-gray-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-300">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-gray-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-300"
+        >
           <LogOut size={18} />
           Log Out
         </button>

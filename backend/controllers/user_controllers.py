@@ -2,7 +2,7 @@
  
 import asyncio
 import asyncpg
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status,Request
 from fastapi.responses import JSONResponse 
 from pydantic import BaseModel, EmailStr
 from typing import Literal
@@ -145,7 +145,7 @@ def set_auth_cookies(response: JSONResponse, user_id: str, user_type: str) -> JS
             value=access_token,
             httponly=True,
             samesite="lax",
-            secure=False,  # TODO: set True in production
+            secure=False,  
             max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
         response.set_cookie(
@@ -153,7 +153,7 @@ def set_auth_cookies(response: JSONResponse, user_id: str, user_type: str) -> JS
             value=refresh_token,
             httponly=True,
             samesite="lax",
-            secure=False,  # TODO: set True in production
+            secure=False,  
             max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         )
         return response
@@ -174,7 +174,7 @@ def clear_auth_cookies(response: JSONResponse) -> JSONResponse:
 # ============================================================
 # CONTROLLERS
 # ============================================================
- 
+
 
 async def register_user(
     payload: RegisterRequest,
@@ -430,6 +430,74 @@ async def delete_user(
         raise
     except Exception as e:
         print(f"Error in delete_user: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected internal server error occurred."
+        )
+
+async def refresh_access_token(request: Request) -> JSONResponse:
+    """
+    Validates the refresh_token from the HTTP-only cookie.
+    If valid, issues a fresh access_token and sets it as a new HttpOnly cookie.
+    """
+    try:
+        # 1. Grab the refresh token directly from the request cookies
+        refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
+        
+        if not refresh_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token missing. Please log in again."
+            )
+            
+        # 2. Decode and validate the token
+        payload = jwt.decode(refresh_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        
+        # Ensure the token provided is actually a refresh token
+        if payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type."
+            )
+            
+        user_id = payload.get("user_id")
+        user_type = payload.get("user_type")
+        
+        # 3. Create a brand new access token
+        new_access_token = create_access_token(user_id, user_type)
+        
+        # 4. Construct the response (NO token in the JSON body!)
+        response = JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"message": "Token refreshed successfully"}
+        )
+        
+        # 5. Overwrite the old access token cookie with the new one
+        response.set_cookie(
+            key=ACCESS_COOKIE_NAME,
+            value=new_access_token,
+            httponly=True,
+            samesite="lax",
+            secure=False,  
+            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        )
+        
+        return response
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Refresh token expired. Please log in again."
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Invalid refresh token."
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in refresh_access_token: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected internal server error occurred."
